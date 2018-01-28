@@ -8,3 +8,4 @@
 - You will be brought to databrew.cc, but the URL at the top will have a special code. Copy-paste the code and send it to joebrew@gmail.com
 
 ![](code.png)
+<img src="code.png" style="display: block; margin: auto;" />
