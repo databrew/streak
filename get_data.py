@@ -5,6 +5,7 @@ import units
 import polyline
 import pandas as pd
 import itertools
+import numpy as np
 
 os.chdir('/home/joebrew/Documents/streak')
 credentials = yaml.load(open('credentials.yaml'))
@@ -19,10 +20,23 @@ if not 'activities.csv' in data_files:
 	columns = ['athlete_id', 'average_speed', 'description', 'distance', 'elapsed_time', 'id', 'map','moving_time', 'name', 'start_date', 'start_date_local', 'start_latitude',  'start_longitude', 'timezone', 'total_elevation_gain', 'type', 'upload_id', 'utc_offset']
 	index = []
 	activities = pd.DataFrame(index=index, columns=columns)
+else:
+	activities = pd.read_csv('data/activities.csv')
 if not 'polylines.csv' in data_files:
 	index = []
 	columns = ['activity_id', 'lng', 'lat']
 	polylines = pd.DataFrame(index=index, columns=columns)
+else:
+	polylines = pd.read_csv('data/polylines.csv')
+
+# Streams
+stream_index = []
+stream_columns = ['activity_id', 'time', 'distance', 'altitude', 'lat', 'lng']
+empty_streams = pd.DataFrame(index = stream_index, columns = stream_columns)
+if not 'streams.csv' in data_files:
+	streams = empty_streams
+else:
+	streams = pd.read_csv('data/streams.csv')
 
 client = Client()
 
@@ -84,6 +98,37 @@ def get_activity_details(client, activity_id):
 	df.utc_offset = activity.upload_id
 	return df
 
+# Define function for getting stream
+def get_activity_stream(client, activity_id):
+	print 'Getting activity stream for activity id ' + str(activity_id)
+	types = ['time', 'distance', 'latlng', 'altitude']
+	the_stream = client.get_activity_streams(activity_id, types=types, resolution='high')
+	# See if there is a stream
+	has_stream = hasattr(the_stream, 'keys')
+	if has_stream:
+		new_stream = pd.DataFrame(index = stream_index, columns = stream_columns)
+		for i in range(0, len(types)):
+			this_type = types[i]
+			if this_type in the_stream.keys():
+				new_stream[this_type] = the_stream[this_type].data
+		if len(new_stream) > 0:
+			df = new_stream
+			if 'latlng' in df.columns:
+				df['latlng'] = df['latlng'].astype(str)
+				df['lat'], df['lng'] = df['latlng'].str.split(', ', 1).str
+				df = df.drop(['latlng'], axis = 1)
+				df['lng'] = df['lng'].str.replace(r"]","")
+				df['lat'] = df['lat'].str.replace(r"[","")
+			else:
+				df['lat'] = np.NaN
+				df['lng'] = np.NaN
+			df['activity_id'] = activity_id
+			return df
+	else:
+		print '--- no stream for this activity id'
+	
+
+
 # Loop through each athlete, populating the relevant activities and polylines tables
 new_activities = pd.DataFrame(index = [],
 		columns = ['athlete_id', 'activity_id'])
@@ -106,18 +151,19 @@ for athlete_id in athletes.id:
 	out['activity_id'] = recent_activities
 	new_activities = new_activities.append(out, ignore_index = True)
 
-
 # Get info on each activity
 columns = ['athlete_id', 'average_speed', 'description', 'distance', 'elapsed_time', 'id', 'map','moving_time', 'name', 'start_date', 'start_date_local', 'start_latitude',  'start_longitude', 'timezone', 'total_elevation_gain', 'type', 'upload_id', 'utc_offset']
 index = []
 details = pd.DataFrame(index = index, columns = columns)
+new_streams = pd.DataFrame(index = stream_index, columns = stream_columns)
 for i in range(0, len(new_activities)):
 	print i
 	activity_id = new_activities['activity_id'][i]
 	athlete_id = new_activities['athlete_id'][i]
 	already = activity_id in activities.id
-	if already:
-		'Skipping since we already have activity' + str(activity_id)
+	already_stream = activity_id in streams.activity_id
+	if already and already_stream:
+		'Skipping since we already have activity ' + str(activity_id) + ' in both activities and streams'
 	else:
 		# Define the access token
 		access_token = athletes.access_token[athletes.id == athlete_id]
@@ -128,14 +174,25 @@ for i in range(0, len(new_activities)):
 		client = Client()
 		# Use the access token for this athlete
 		client.access_token = access_token
-		out = get_activity_details(client = client, activity_id = activity_id)
-		details = details.append(out, ignore_index = True)
+		if not already:
+			# Get new activities details
+			out = get_activity_details(client = client, activity_id = activity_id)
+			# Add to old details
+			details = details.append(out, ignore_index = True)
+		if not already_stream:
+			ns = get_activity_stream(client = client, activity_id = activity_id)
+			# Add to new_streams
+			new_streams = new_streams.append(ns, ignore_index = True)
 
 # Add all the old activities and the new ones
 activities = activities.append(details, ignore_index = True)
-
 # Overwrite the old activities table
-activities.to_csv('data/activities.csv')
+activities.to_csv('data/activities.csv', index = False)
+
+# Add all the old streams to the new ones
+streams = streams.append(new_streams, ignore_index = True)
+# Overwrite the old streams table
+streams.to_csv('data/streams.csv', index = False)
 
 # Get the polylines too
 index = []
@@ -160,7 +217,7 @@ for i in range(0, len(details)):
 			new_polylines = new_polylines.append(df, ignore_index = True)
 # Add old and new
 polylines = polylines.append(new_polylines, ignore_index = True)
-polylines.to_csv('data/polylines.csv')
+polylines.to_csv('data/polylines.csv', index = False)
 
 
 
