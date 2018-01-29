@@ -47,7 +47,7 @@ client = Client()
 # # use code to get token
 # code = '2643ddfd5c65ffd57b945221957794e483695cb4' # ben
 # # Extract the code from your webapp response
-# # code = request.get('code') # or whatever your framework does
+## code = request.get('code') # or whatever your framework does
 # access_token = client.exchange_code_for_token(client_id=credentials['client_id'], client_secret = credentials['client_secret'], code=code)
 # if 'access_token.txt' in files:
 # 	text_file = open('access_token.txt')
@@ -63,11 +63,31 @@ client = Client()
 
 # Define function for getting recent activity ids
 def get_recent_activity_ids(client):
-	activities_list = client.get_activities(after = "2018-01-01T00:00:00Z",  limit=20)
+	# Tip To get activities in oldest to newest, specify a value for the after argument. To get newest to oldest use before argument.
+	# max is 200
+	# Since get_activities doesn't allow for pagination, 
+	# we'll have to loop through some dates
+	dates = ["2015-01-01T00:00:00Z", "2016-01-01T00:00:00Z", "2017-01-01T00:00:00Z", "2017-06-01T00:00:00Z", "2017-12-31T00:00:00Z", "2018-01-29T00:00:00Z" ]
+	old_activities = []
+	for i in range(0, len(dates)):
+		this_date = dates[i]
+		print this_date
+		sub_list = client.get_activities(before = this_date,  limit=200)
+		sub_out = []
+		for activity in sub_list:
+			sub_out.append("{0.id}".format(activity))		
+			print('---' + "{0.id}".format(activity))
+		old_activities = old_activities + sub_out
+	# Now get the most recent stuff
+	activities_list = client.get_activities(before = "2025-01-30T00:00:00Z",  limit=200)
 	out = []
 	for activity in activities_list:
 		out.append("{0.id}".format(activity))		
 		print('---' + "{0.id}".format(activity))
+	# Combine out (new stuff) and old activities and keep only unique
+	out = out + old_activities
+	outset = set(out)
+	xout = list(outset)
 	return out
 
 # Define function for getting relevant activity details based on activity id

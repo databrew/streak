@@ -15,10 +15,15 @@ streams_sub <- streams %>%
            activities$id[activities$athlete_id == athletes$id[athletes$firstname == 'Joe']])
 streams_sub <- 
   streams_sub %>%
-  group_by(lng = round(lng, digits = 4),
+  group_by(activity_id,
+           lng = round(lng, digits = 4),
            lat = round(lat, digits = 4)) %>%
   summarise(n = n()) %>%
-  filter(!is.na(lng))
+  ungroup %>%
+  filter(!is.na(lng)) %>%
+  left_join(activities %>% dplyr::select(id, timezone),
+            by = c('activity_id' = 'id')) %>%
+  grepl('Amsterdam', timezone)
 
 leaflet(streams_sub) %>% addProviderTiles(providers$CartoDB.DarkMatter) %>%
   addWebGLHeatmap(lng=~lng, lat=~lat, #intensity = ~n,
