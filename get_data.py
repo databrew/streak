@@ -67,7 +67,7 @@ def get_recent_activity_ids(client):
 	out = []
 	for activity in activities_list:
 		out.append("{0.id}".format(activity))		
-		print("{0.id}".format(activity))
+		print('---' + "{0.id}".format(activity))
 	return out
 
 # Define function for getting relevant activity details based on activity id
@@ -133,7 +133,7 @@ def get_activity_stream(client, activity_id):
 new_activities = pd.DataFrame(index = [],
 		columns = ['athlete_id', 'activity_id'])
 for athlete_id in athletes.id:
-	print 'Getting activities for ' + str(athlete_id)
+	print 'Getting activities for ' + str(athletes['firstname'][athletes.id == athlete_id].values.astype(str)) + ' id: ' + str(athlete_id)
 	# Define the access token
 	access_token = athletes.access_token[athletes.id == athlete_id]
 	access_token = access_token.to_string()
@@ -157,13 +157,13 @@ index = []
 details = pd.DataFrame(index = index, columns = columns)
 new_streams = pd.DataFrame(index = stream_index, columns = stream_columns)
 for i in range(0, len(new_activities)):
-	print i
 	activity_id = new_activities['activity_id'][i]
 	athlete_id = new_activities['athlete_id'][i]
-	already = activity_id in activities.id
-	already_stream = activity_id in streams.activity_id
+	print str(activity_id)
+	already = any(int(activity_id) == pd.Series(list(activities.id)))
+	already_stream = any(int(activity_id) == pd.Series(list(streams.activity_id)))
 	if already and already_stream:
-		'Skipping since we already have activity ' + str(activity_id) + ' in both activities and streams'
+		print '---Skipping since we already have activity ' + str(activity_id) + ' in both activities and streams'
 	else:
 		# Define the access token
 		access_token = athletes.access_token[athletes.id == athlete_id]
@@ -175,11 +175,13 @@ for i in range(0, len(new_activities)):
 		# Use the access token for this athlete
 		client.access_token = access_token
 		if not already:
+			print('---Getting activity details for ' +str(activity_id))
 			# Get new activities details
 			out = get_activity_details(client = client, activity_id = activity_id)
 			# Add to old details
 			details = details.append(out, ignore_index = True)
 		if not already_stream:
+			print('---Getting activity stream for ' +str(activity_id))
 			ns = get_activity_stream(client = client, activity_id = activity_id)
 			# Add to new_streams
 			new_streams = new_streams.append(ns, ignore_index = True)
@@ -200,7 +202,7 @@ columns = ['activity_id', 'lng', 'lat']
 new_polylines = pd.DataFrame(index=index, columns=columns) 
 for i in range(0, len(details)):
 	activity_id = details['id'][i]
-	already = activity_id in activities.id
+	already = any(int(activity_id) == pd.Series(list(polylines.activity_id)))
 	if already:
 		'Skipping since we already have activity' + str(activity_id)
 	else:

@@ -1,11 +1,29 @@
 library(tidyverse)
 library(ggthemes)
 library(RColorBrewer)
+library(leaflet.extras)
+
 
 athletes <- read_csv('data/athletes.csv')
 activities <- read_csv('data/activities.csv')
 polylines <- read_csv('data/polylines.csv')
 streams <- read_csv('data/streams.csv')
+
+# joe streams
+streams_sub <- streams %>%
+  filter(activity_id %in% 
+           activities$id[activities$athlete_id == athletes$id[athletes$firstname == 'Joe']])
+streams_sub <- 
+  streams_sub %>%
+  group_by(lng = round(lng, digits = 4),
+           lat = round(lat, digits = 4)) %>%
+  summarise(n = n()) %>%
+  filter(!is.na(lng))
+
+leaflet(streams_sub) %>% addProviderTiles(providers$CartoDB.DarkMatter) %>%
+  addWebGLHeatmap(lng=~lng, lat=~lat, #intensity = ~n,
+                  # size=25,units='px',
+                  size = 40, units = 'm')
 
 stream_plot_data <- streams %>%
   left_join(activities %>%
