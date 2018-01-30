@@ -69,16 +69,15 @@ def get_recent_activity_ids(client):
 	# we'll have to loop through some dates
 	dates = ["2015-01-01T00:00:00Z", "2016-01-01T00:00:00Z", "2017-01-01T00:00:00Z", "2017-06-01T00:00:00Z", "2017-12-31T00:00:00Z", "2018-01-29T00:00:00Z" ]
 	old_activities = []
-	# # Having run the below once, commenting out
-	# for i in range(0, len(dates)):
-	# 	this_date = dates[i]
-	# 	print this_date
-	# 	sub_list = client.get_activities(before = this_date,  limit=200)
-	# 	sub_out = []
-	# 	for activity in sub_list:
-	# 		sub_out.append("{0.id}".format(activity))		
-	# 		print('---' + "{0.id}".format(activity))
-	# 	old_activities = old_activities + sub_out
+	for i in range(0, len(dates)):
+		this_date = dates[i]
+		print this_date
+		sub_list = client.get_activities(before = this_date,  limit=200)
+		sub_out = []
+		for activity in sub_list:
+			sub_out.append("{0.id}".format(activity))		
+			print('---' + "{0.id}".format(activity))
+		old_activities = old_activities + sub_out
 	# Now get the most recent stuff
 	activities_list = client.get_activities(before = "2025-01-30T00:00:00Z",  limit=200)
 	out = []

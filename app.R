@@ -30,12 +30,15 @@ body <- dashboardBody(
       tabName="main",
       fluidPage(
         fluidRow(
+          # a(href="http://databrew.cc",
+          #   target="_blank", 
+            uiOutput("box1"),#),
           a(href="http://databrew.cc",
-            target="_blank", uiOutput("box1")),
+            target="_blank", 
+            uiOutput("box2")),
           a(href="http://databrew.cc",
-            target="_blank", uiOutput("box2")),
-          a(href="http://databrew.cc",
-            target="_blank", uiOutput("box3"))
+            target="_blank", 
+            uiOutput("box3"))
         ),
         fluidRow(column(6,
                         fluidRow(
@@ -49,23 +52,22 @@ body <- dashboardBody(
                                  dateRangeInput('date_range',
                                                 'Restrict dates',
                                                 start = as.Date('2018-01-29'),
-                                                end = Sys.Date(),
+                                                end = Sys.Date() + 1,
                                                 min = as.Date('2017-01-01'),
-                                                max = Sys.Date()))
+                                                max = Sys.Date() + 1))
                         ),
                         plotOutput('main_plot')),
                  column(6,
-                        textOutput('leaf_text'),
+                        h3(textOutput('leaf_text'), align='center'),
+                        leafletOutput('leaf'),
                         fluidRow(column(4,
                                         checkboxInput('simple_map',
-                                                      'Rough approximations for map (faster)',
+                                                      'Rough approximations for line map (much faster)',
                                                       TRUE)),
-                                 column(4),
-                                 column(4,
+                                 column(8,
                                         checkboxInput('lines',
-                                                      'Show lines (instead of heat map)',
-                                                      FALSE))),
-                        leafletOutput('leaf'))),
+                                                      'Show lines instead of heat map (much slower - only recommended if fewer than 30 mappable activities are selected)',
+                                                      FALSE))))),
         fluidRow(column(6),
                  column(6))
       )
@@ -141,7 +143,9 @@ server <- function(input, output) {
     } else {
       this_athlete_id = athletes %>% filter(firstname %in% input$athlete) %>%
         .$id
-      if(input$simple_map){
+      # We only use polylines if the map is both simple AND lines are selected
+      # if the map is simple, but it's a "heat" map, then we opt for full points
+      if(input$simple_map & input$lines){
         # Simple: using polylines
         x <- polylines
       } else {
@@ -170,7 +174,7 @@ server <- function(input, output) {
       }
     }
     if(has_map){
-      return(NULL)
+      paste0(length(unique(tracks_sub$activity_id)), ' mappable activities')
     } else {
       'No spatial data available.'
     }
@@ -205,24 +209,29 @@ server <- function(input, output) {
         if(make_lines){
           cols <- colorRampPalette(brewer.pal(n = 9, 'Spectral'))(length(unique(tracks_sub$athlete_id)))
           tracks_sub$colors <- cols[as.numeric(factor(tracks_sub$athlete_id))]
-          activity_ids <- tracks_sub$activity_id
+          activity_ids <- unique(tracks_sub$activity_id)
           for(i in 1:length(activity_ids)){
+            message(i)
             this_activity <- tracks_sub %>% filter(activity_id == activity_ids[i])
             l <- l %>%
               addPolylines(data = this_activity, lng = ~lng, lat = ~lat, 
                            group = ~activity_id,
-                           color = ~colors,
+                           color = tracks_sub$colors,
                            weight = 3,
                            opacity = 0.2,
                            fill = FALSE,
                            popup = paste0('<a href="https://www.strava.com/activities/', this_activity$activity_id, '">See activity on Strava</a>'))
           }
-            
-
         } else {
+          
           l <- l %>%
-            addWebGLHeatmap(data = tracks_sub, lng=~lng, lat=~lat, #intensity = ~n,
-                            size=15,units='px')#,
+            addWebGLHeatmap(data = tracks_sub, lng=~lng, lat=~lat, 
+                            # intensity = ~n,
+                            size = 10, units = 'px'
+                            # size = 60, units = 'm'
+                            )
+                            #intensity = ~n,
+                            # size=25,units='px')#,
           # size = 45, units = 'm')
         }
 
@@ -270,7 +279,8 @@ server <- function(input, output) {
                    group = firstname,
                    color = firstname)) +
           geom_point() +
-          geom_line() +
+          geom_step() +
+          # geom_line() +
           scale_color_manual(name = '',
                              values = cols) +
           theme_black() +

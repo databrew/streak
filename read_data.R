@@ -27,6 +27,9 @@ activities$average_speed_clean <-
 # Get whether during the streak or not
 activities$streak <- activities$start_date_local >= as.Date('2018-01-29')
 
+# Make start date a date object
+activities$start_date_local <- as.Date(activities$start_date_local)
+
 # # joe streams
 # streams_sub <- streams %>%
 #   filter(activity_id %in% 
