@@ -20,6 +20,10 @@ clean_time <- function(x){
 activities$elapsed_time_clean <- clean_time(activities$elapsed_time)
 activities$moving_time_clean <- clean_time(activities$moving_time)
 
+# clean up average speed
+activities$average_speed_clean <- 
+  as.numeric(unlist(lapply(strsplit(activities$average_speed, ' '), function(x){x[1]})))
+
 # Get whether during the streak or not
 activities$streak <- activities$start_date_local >= as.Date('2018-01-29')
 
