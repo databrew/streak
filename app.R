@@ -279,7 +279,7 @@ server <- function(input, output) {
                    group = firstname,
                    color = firstname)) +
           geom_point() +
-          geom_step() +
+          geom_line() +
           # geom_line() +
           scale_color_manual(name = '',
                              values = cols) +
