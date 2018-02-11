@@ -207,7 +207,7 @@ server <- function(input, output) {
           }
         }
         if(make_lines){
-          cols <- colorRampPalette(brewer.pal(n = 9, 'Spectral'))(length(unique(tracks_sub$athlete_id)))
+          cols <- colorRampPalette(brewer.pal(n = 8, 'Set1'))(length(unique(tracks_sub$athlete_id)))
           tracks_sub$colors <- cols[as.numeric(factor(tracks_sub$athlete_id))]
           activity_ids <- unique(tracks_sub$activity_id)
           for(i in 1:length(activity_ids)){
@@ -217,18 +217,22 @@ server <- function(input, output) {
               addPolylines(data = this_activity, lng = ~lng, lat = ~lat, 
                            group = ~activity_id,
                            color = tracks_sub$colors,
-                           weight = 3,
+                           weight = 0.5,
                            opacity = 0.2,
                            fill = FALSE,
                            popup = paste0('<a href="https://www.strava.com/activities/', this_activity$activity_id, '">See activity on Strava</a>'))
           }
         } else {
+          # x <- tracks_sub %>%
+          #   group_by(lng = round(lng, digits = 4),
+          #            lat = round(lat, digits = 4)) %>%
+          #   tally %>% ungroup
           
           l <- l %>%
             addWebGLHeatmap(data = tracks_sub, lng=~lng, lat=~lat, 
                             # intensity = ~n,
-                            size = 10, units = 'px'
-                            # size = 60, units = 'm'
+                            # size = 10, units = 'px'
+                            size = 30, units = 'm'
                             )
                             #intensity = ~n,
                             # size=25,units='px')#,
@@ -271,7 +275,7 @@ server <- function(input, output) {
             bind_rows(minimum)
         }
           
-        cols <- colorRampPalette(brewer.pal(9, 'Spectral'))(length(unique(plot_data$firstname)))
+        cols <- colorRampPalette(brewer.pal(8, 'Set1'))(length(unique(plot_data$firstname)))
         print(head(plot_data))
         g1 <- ggplot(data = plot_data, 
                aes(x = date,
@@ -289,7 +293,7 @@ server <- function(input, output) {
         g1
         
         by_type <- af %>%
-          mutate(type = ifelse(type == 'Run' & average_speed_clean < 1.9,
+          mutate(type = ifelse(type == 'Run' & average_speed_clean < 1.9 | type == 'Hike',
                                'Walk', 
                                ifelse(type == 'WeightTraining', 'Workout',
                                       type))) %>%
