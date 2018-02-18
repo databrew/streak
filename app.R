@@ -26,39 +26,59 @@ body <- dashboardBody(
   tags$head(
     tags$link(rel = "stylesheet", type = "text/css", href = "custom.css")
   ),
+  tags$head(tags$link(rel = 'stylesheet', type = 'text/css', href = 'https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css')),
+  tags$head(tags$link(rel = 'stylesheet', type = 'text/css', href = 'dist/daterangepicker.min.css')),
+  # tags$head(tags$script(src = 'https://cdnjs.cloudflare.com/ajax/libs/jquery/1.12.4/jquery.min.js', type = 'text/javascript')),
+  tags$head(tags$script(src = 'https://cdnjs.cloudflare.com/ajax/libs/moment.js/2.16.0/moment.min.js', type = 'text/javascript')),
+  tags$head(tags$script(src = 'src/jquery.daterangepicker.js')),
+  tags$head(tags$script(src = 'demo.js')),
+  tags$head(tags$script(src = 'src/jquery.daterangepicker.js')),
+  
+  
+  tags$head(tags$style(HTML("
+                            
+                            #wrapper
+                            {
+                            width:600px;
+                            margin:0 auto;
+                            color:#333;
+                            font-family:Tahoma,Verdana,sans-serif;
+                            line-height:1.5;
+                            font-size:14px;
+                            }
+                            .demo { margin:30px 0;}
+                            .date-picker-wrapper .month-wrapper table .day.lalala { background-color:orange; }
+                            .options { display:none; border-left:6px solid #8ae; padding:10px; font-size:12px; line-height:1.4; background-color:#eee; border-radius:4px;}
+                            
+                            "))),
+  
+  
   tabItems(
     tabItem(
       tabName="main",
       fluidPage(
         fluidRow(
-          # a(href="http://databrew.cc",
-          #   target="_blank", 
-            uiOutput("box1"),#),
+          column(6,
+                 align = 'center',
+                 uiOutput('date_ui'),
+                 actionButton('reset_date_range', 'Reset', icon = icon('undo'),style='padding:3px; font-size:80%')),
+          uiOutput("box1"),
           a(href="http://databrew.cc",
             target="_blank", 
             uiOutput("box2")),
           a(href="http://databrew.cc",
             target="_blank", 
             uiOutput("box3"))
+          
         ),
         fluidRow(column(6,
-                        fluidRow(
-                          column(6,
-                                 selectInput('athlete',
-                                             'Select 1 or more athletes',
-                                             choices = sort(unique(athletes$firstname)),
-                                             selected = c('Ben', 'Chris', 'Joe', 'Xing'), #sort(unique(athletes$firstname)),
-                                             multiple = TRUE)),
-                          column(6,
-                                 dateRangeInput('date_range',
-                                                'Restrict dates',
-                                                start = as.Date('2018-01-29'),
-                                                end = Sys.Date() + 1,
-                                                min = as.Date('2017-01-01'),
-                                                max = Sys.Date() + 1))
-                        ),
-                        plotOutput('main_plot'),
-                        checkboxInput('stack', 'Stack bars?', FALSE)),
+                        selectInput('athlete',
+                                    'Select 1 or more athletes',
+                                    choices = sort(unique(athletes$firstname)),
+                                    selected = c('Ben', 'Chris', 'Joe', 'Xing'), #sort(unique(athletes$firstname)),
+                                    multiple = TRUE),
+                        checkboxInput('stack', 'Stack bars?', FALSE),
+                        plotOutput('main_plot')),
                  column(6,
                         tabsetPanel(
                           tabPanel('Static map',
@@ -79,17 +99,16 @@ body <- dashboardBody(
                                                    checkboxInput('lines',
                                                                  'Show lines instead of heat map (much slower - only recommended if fewer than 30 mappable activities are selected)',
                                                                  FALSE)))
-                                   )
-                        )
+                          )
                         ))
-      )
-    ),
+                 )
+      )),
     tabItem(
       tabName = 'about',
       fluidPage()
     )
   )
-)
+  )
 
 # UI
 ui <- dashboardPage(header, sidebar, body, skin="blue")
@@ -97,12 +116,58 @@ ui <- dashboardPage(header, sidebar, body, skin="blue")
 # Server
 server <- function(input, output) {
   
+  date_range <- reactiveVal(c(as.Date('2018-01-29'),
+                              Sys.Date() + 1 ))
+  observeEvent(input$daterange12,{
+    date_input <- input$daterange12
+    message('Dates changed. They are: ')
+    print(input$daterange12)
+    new_dates <- unlist(strsplit(date_input, split = ' to '))
+    new_dates <- as.Date(new_dates)
+    date_range(new_dates)
+  })
+  
+  output$date_ui <- renderUI({
+    
+    dr <- date_range()
+    dr <- paste0(as.character(dr[1]), ' to ', as.character(dr[2]))
+    fluidPage(
+      tags$div(HTML("
+                    <label for=\"daterange12container\">Pick a date range for analysis</label>
+                    
+                    <div id='daterange12container' style=\"width:456px;\">
+                    <input id=\"daterange12\" name=\"joe\" type=\"hidden\" class=\"form-control\" value=\"",dr, "\"/>
+                    
+                    </div>
+                    <script type=\"text/javascript\">
+                    $(function() {
+                    $('#daterange12').dateRangePicker({
+                    inline: true,
+                    container: '#daterange12container',
+                    alwaysOpen: true
+                    });
+                    
+                    // Observe changes and update:
+                    
+                    $('#daterange12').on('datepicker-change', function(event, changeObject) {
+                    // changeObject has properties value, date1 and date2.
+                    Shiny.onInputChange('daterange12', changeObject.value);
+                    });
+                    });
+                    </script>
+                    
+                    "))
+      )
+})
+  
+  
   output$box1 <- renderUI({
     valueBox(
       as.numeric(Sys.Date() - as.Date('2018-01-29')) + 1,
       "Day number", 
       icon = icon("calendar"),
-      color = 'blue'
+      color = 'blue',
+      width = 2
     )})
   
   output$box2 <- renderUI({
@@ -110,7 +175,8 @@ server <- function(input, output) {
       nrow(athletes), 
       "Participants", 
       icon = icon("tachometer"),
-      color = 'orange'
+      color = 'orange',
+      width = 2
     )})
   
   output$box3 <- renderUI({
@@ -118,7 +184,8 @@ server <- function(input, output) {
       round(sum(activities$moving_time_clean[activities$start_date_local >= '2018-01-29']) / 60), 
       "minutes exercised", 
       icon = icon("clock-o"),
-      color = 'green'
+      color = 'green',
+      width = 2
     )})
   
   activities_filtered <- reactive({
@@ -129,8 +196,9 @@ server <- function(input, output) {
         .$id
       x <- activities %>%
         filter(athlete_id %in% this_athlete_id)
-      x <- x %>% filter(start_date_local >= input$date_range[1],
-                        start_date_local <= input$date_range[2])
+      dr <- date_range()
+      x <- x %>% filter(start_date_local >= dr[1],
+                        start_date_local <= dr[2])
       x
     }
   })
@@ -150,13 +218,14 @@ server <- function(input, output) {
         # Not simple: using streams
         x <- streams
       }
+      dr <- date_range()
       x <- x %>%
         left_join(activities %>%
                     dplyr::select(id, athlete_id, streak, start_date_local),
                   by = c('activity_id'='id')) %>%
-      filter(athlete_id %in% this_athlete_id) %>%
-      filter(start_date_local >= input$date_range[1],
-                          start_date_local <= input$date_range[2])
+        filter(athlete_id %in% this_athlete_id) %>%
+        filter(start_date_local >= dr[1],
+               start_date_local <= dr[2])
       x <- x %>% filter(!is.na(lng), !is.na(lat))
       return(x)
     }
@@ -191,7 +260,7 @@ server <- function(input, output) {
             options = layersControlOptions(collapsed = TRUE)
           ) %>%
           addDrawToolbar(editOptions = editToolbarOptions(
-                           selectedPathOptions = selectedPathOptions())) %>%
+            selectedPathOptions = selectedPathOptions())) %>%
           addMeasurePathToolbar(options =
                                   measurePathOptions(imperial = TRUE,
                                                      minPixelDistance = 100,
@@ -233,14 +302,14 @@ server <- function(input, output) {
                             # intensity = ~n,
                             # size = 10, units = 'px'
                             size = 30, units = 'm'
-                            )
-                            #intensity = ~n,
-                            # size=25,units='px')#,
+            )
+          #intensity = ~n,
+          # size=25,units='px')#,
           # size = 45, units = 'm')
         }
-
-
-          return(l)
+        
+        
+        return(l)
       }
     }
   })
@@ -298,7 +367,7 @@ server <- function(input, output) {
             panel.background = element_rect(fill = "black", color  =  NA),  
             panel.border = element_rect(fill = NA, color = "black"),  
             plot.background = element_rect(color = "black", fill = "black")
-            ) +
+          ) +
           theme(panel.grid.minor=element_blank(), 
                 panel.grid.major=element_blank(),
                 panel.background=element_blank()) + 
@@ -326,10 +395,10 @@ server <- function(input, output) {
           theme(legend.position = 'bottomright') +
           guides(fill=guide_legend(ncol=length(unique(tracks_sub$firstname)))) +
           labs(x = '', y = '')
-          
+        
       }
     }
-        
+    
   })
   
   output$main_plot <- renderPlot({
@@ -352,16 +421,16 @@ server <- function(input, output) {
           dplyr::select(date, minutes, minutes_cum, firstname)
         # Add a "minimum" 
         minimum <- data.frame(date = seq(as.Date('2018-01-29'),
-                       max(plot_data$date) + 10,
-                       by = 1),
-                       minutes = 30,
-                       firstname = '-Minimum-')
+                                         max(plot_data$date) + 10,
+                                         by = 1),
+                              minutes = 30,
+                              firstname = '-Minimum-')
         minimum$minutes_cum <- cumsum(minimum$minutes)
         if(min(plot_data$date) == '2018-01-29'){
           plot_data <- plot_data %>%
             bind_rows(minimum)
         }
-          
+        
         # cols <- colorRampPalette(brewer.pal(8, 'Dark2'))(length(unique(plot_data$firstname)))
         # cols <- rainbow(length(unique(plot_data$firstname)))
         cols <- athletes %>%
@@ -373,10 +442,10 @@ server <- function(input, output) {
           filter(firstname %in% c(plot_data$firstname, '-Minimum')) %>%
           .$col
         g1 <- ggplot(data = plot_data, 
-               aes(x = date,
-                   y = minutes_cum,
-                   group = firstname,
-                   color = firstname)) +
+                     aes(x = date,
+                         y = minutes_cum,
+                         group = firstname,
+                         color = firstname)) +
           geom_line() +
           # geom_line() +
           scale_color_manual(name = '',
@@ -399,7 +468,7 @@ server <- function(input, output) {
                     by = c('athlete_id' = 'id'))
         cols_type <- colorRampPalette(brewer.pal(8, 'Dark2'))(length(unique(by_type$type)))
         # cols_type <- rainbow(length(unique(by_type$type)))
-
+        
         if(input$stack){
           pos <- 'stack'  
         } else {
@@ -422,6 +491,6 @@ server <- function(input, output) {
       }
     }
   })
-}
+                            }
 
 shinyApp(ui, server)
