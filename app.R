@@ -6,6 +6,7 @@ library(dplyr)
 options(scipen='999')
 source('read_data.R')
 source('functions.R')
+source('global.R')
 
 header <- dashboardHeader(title="The streak")
 sidebar <- dashboardSidebar(
@@ -46,7 +47,7 @@ body <- dashboardBody(
                                  selectInput('athlete',
                                              'Select 1 or more athletes',
                                              choices = sort(unique(athletes$firstname)),
-                                             selected = sort(unique(athletes$firstname)),
+                                             selected = c('Ben', 'Chris', 'Joe', 'Xing'), #sort(unique(athletes$firstname)),
                                              multiple = TRUE)),
                           column(6,
                                  dateRangeInput('date_range',
@@ -56,39 +57,36 @@ body <- dashboardBody(
                                                 min = as.Date('2017-01-01'),
                                                 max = Sys.Date() + 1))
                         ),
-                        plotOutput('main_plot')),
+                        plotOutput('main_plot'),
+                        checkboxInput('stack', 'Stack bars?', FALSE)),
                  column(6,
-                        h3(textOutput('leaf_text'), align='center'),
-                        leafletOutput('leaf'),
-                        fluidRow(column(4,
-                                        checkboxInput('simple_map',
-                                                      'Rough approximations for line map (much faster)',
-                                                      TRUE)),
-                                 column(8,
-                                        checkboxInput('lines',
-                                                      'Show lines instead of heat map (much slower - only recommended if fewer than 30 mappable activities are selected)',
-                                                      FALSE))))),
-        fluidRow(column(6),
-                 column(6))
+                        tabsetPanel(
+                          tabPanel('Static map',
+                                   radioButtons('static_input',
+                                                'One map per:',
+                                                choices = c('Place', 'Activity'),
+                                                inline = TRUE,
+                                                selected = 'Activity'),
+                                   plotOutput('static')),
+                          tabPanel('Interactive map',
+                                   h3(textOutput('leaf_text'), align='center'),
+                                   leafletOutput('leaf'),
+                                   fluidRow(column(4,
+                                                   checkboxInput('simple_map',
+                                                                 'Rough approximations for line map (much faster)',
+                                                                 TRUE)),
+                                            column(8,
+                                                   checkboxInput('lines',
+                                                                 'Show lines instead of heat map (much slower - only recommended if fewer than 30 mappable activities are selected)',
+                                                                 FALSE)))
+                                   )
+                        )
+                        ))
       )
     ),
     tabItem(
       tabName = 'about',
-      fluidPage(
-        fluidRow(
-          div(img(src='logo_clear.png', align = "center"), style="text-align: center;"),
-                 h4('Built in partnership with ',
-                   a(href = 'http://databrew.cc',
-                     target='_blank', 'Databrew'),
-                   align = 'center'),
-          p('Empowering research and analysis through collaborative data science.', align = 'center'),
-          div(a(actionButton(inputId = "email", label = "info@databrew.cc", 
-                             icon = icon("envelope", lib = "font-awesome")),
-                href="mailto:info@databrew.cc",
-                align = 'center')), 
-          style = 'text-align:center;'
-          )
-        )
+      fluidPage()
     )
   )
 )
@@ -207,7 +205,9 @@ server <- function(input, output) {
           }
         }
         if(make_lines){
-          cols <- colorRampPalette(brewer.pal(n = 8, 'Set1'))(length(unique(tracks_sub$athlete_id)))
+          # cols <- colorRampPalette(brewer.pal(n = 8, 'Dark2'))(length(unique(tracks_sub$athlete_id)))
+          cols <- rainbow(length(unique(plot_data$firstname)))
+          
           tracks_sub$colors <- cols[as.numeric(factor(tracks_sub$athlete_id))]
           activity_ids <- unique(tracks_sub$activity_id)
           for(i in 1:length(activity_ids)){
@@ -245,6 +245,93 @@ server <- function(input, output) {
     }
   })
   
+  output$static <- renderPlot({
+    tracks_sub <- tracks()
+    if(!is.null(tracks_sub)){
+      if(nrow(tracks_sub) > 0){
+        
+        byby <- input$static_input
+        cols <- athletes %>%
+          dplyr::select(id, firstname) %>%
+          bind_rows(data.frame(id = 123, firstname = 'Minimum')) %>%
+          arrange(firstname)
+        cols <- cols %>%
+          mutate(col = rainbow(nrow(cols))) %>%
+          filter(id %in% tracks_sub$athlete_id) %>%
+          .$col
+        print(head(tracks_sub))
+        
+        tracks_sub <- tracks_sub %>%
+          left_join(athletes %>% dplyr::select(id, firstname),
+                    by = c('athlete_id' = 'id'))
+        
+        
+        if(byby == 'Place'){
+          g <- ggplot(data = tracks_sub,
+                      aes(x = lng,
+                          y = lat)) +
+            geom_path(aes(group = activity_id,
+                          color = factor(firstname)),
+                      size = 0.35, lineend = "round",
+                      alpha = 0.3) +
+            facet_wrap(~place_id, scales = 'free')
+        } else if(byby == 'Activity'){
+          g <- ggplot(data = tracks_sub,
+                      aes(x = lng,
+                          y = lat)) +
+            geom_path(aes(group = activity_id,
+                          color = factor(firstname)),
+                      size = 0.85, lineend = "round",
+                      alpha = 0.3) +
+            facet_wrap(~activity_id, scales = 'free')
+        }
+        
+        
+        g +
+          scale_color_manual(name = '', values = cols) +
+          theme_black() +
+          theme(
+            # Specify panel options
+            panel.spacing = ggplot2::unit(0, "lines"), 
+            strip.background = ggplot2::element_blank(), strip.text = ggplot2::element_blank(), 
+            plot.margin = ggplot2::unit(rep(1, 4), "cm"),
+            panel.background = element_rect(fill = "black", color  =  NA),  
+            panel.border = element_rect(fill = NA, color = "black"),  
+            plot.background = element_rect(color = "black", fill = "black")
+            ) +
+          theme(panel.grid.minor=element_blank(), 
+                panel.grid.major=element_blank(),
+                panel.background=element_blank()) + 
+          theme(plot.background=element_rect(fill="black"),
+                panel.background=element_rect(fill='black'), 
+                legend.background= element_rect(fill="black", colour=NA),
+                legend.key = element_rect(colour = NA, col = "black",
+                                          size = .5, fill = 'black')) +
+          theme(axis.line = element_blank(), 
+                axis.text = element_blank(), 
+                axis.ticks = element_blank(), 
+                # axis.title = element_blank(), 
+                panel.border = element_blank(), 
+                panel.spacing = unit(0, 
+                                     "lines"), 
+                legend.justification = c(0, 0), 
+                legend.position = c(0, 
+                                    0)) +
+          theme(axis.text.x=element_blank(),axis.ticks.x=element_blank(),
+                plot.margin=unit(c(0,0,0,0), "lines")) +
+          theme(panel.background = element_blank(),
+                panel.grid.major = element_blank(), 
+                panel.grid.minor = element_blank()) +
+          # theme(legend.position = 'none') +
+          theme(legend.position = 'bottomright') +
+          guides(fill=guide_legend(ncol=length(unique(tracks_sub$firstname)))) +
+          labs(x = '', y = '')
+          
+      }
+    }
+        
+  })
+  
   output$main_plot <- renderPlot({
     af <- activities_filtered()
     if(!is.null(af)){
@@ -275,14 +362,21 @@ server <- function(input, output) {
             bind_rows(minimum)
         }
           
-        cols <- colorRampPalette(brewer.pal(8, 'Set1'))(length(unique(plot_data$firstname)))
-        print(head(plot_data))
+        # cols <- colorRampPalette(brewer.pal(8, 'Dark2'))(length(unique(plot_data$firstname)))
+        # cols <- rainbow(length(unique(plot_data$firstname)))
+        cols <- athletes %>%
+          dplyr::select(id, firstname) %>%
+          bind_rows(data.frame(id = 123, firstname = '-Minimum-')) %>%
+          arrange(firstname)
+        cols <- cols %>%
+          mutate(col = rainbow(nrow(cols))) %>%
+          filter(firstname %in% c(plot_data$firstname, '-Minimum')) %>%
+          .$col
         g1 <- ggplot(data = plot_data, 
                aes(x = date,
                    y = minutes_cum,
                    group = firstname,
                    color = firstname)) +
-          geom_point() +
           geom_line() +
           # geom_line() +
           scale_color_manual(name = '',
@@ -304,13 +398,21 @@ server <- function(input, output) {
                       dplyr::select(id, firstname),
                     by = c('athlete_id' = 'id'))
         cols_type <- colorRampPalette(brewer.pal(8, 'Dark2'))(length(unique(by_type$type)))
+        # cols_type <- rainbow(length(unique(by_type$type)))
+
+        if(input$stack){
+          pos <- 'stack'  
+        } else {
+          pos <- 'dodge'
+        }
+        
         g2 <- ggplot(data = by_type,
                      aes(x = firstname,
                          y = minutes,
                          group = type,
                          fill = type)) +
           geom_bar(stat = 'identity',
-                   position = 'dodge') +
+                   position = pos) +
           scale_fill_manual(name = '',
                             values = cols_type) +
           labs(x = 'Name',
