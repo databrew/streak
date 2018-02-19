@@ -18,7 +18,11 @@ sidebar <- dashboardSidebar(
     menuItem(
       text = 'About',
       tabName = 'about',
-      icon = icon("cog", lib = "glyphicon"))
+      icon = icon("cog", lib = "glyphicon")),
+    uiOutput("box1"),
+    a(href="http://databrew.cc",
+      target="_blank", 
+      uiOutput("box3"))
   )
 )
 
@@ -57,30 +61,34 @@ body <- dashboardBody(
     tabItem(
       tabName="main",
       fluidPage(
+        fluidRow(h3('Total hours', align = 'center')),
+        uiOutput('boxes_ui'),
         fluidRow(
           column(6,
                  align = 'center',
                  uiOutput('date_ui'),
                  actionButton('reset_date_range', 'Reset', icon = icon('undo'),style='padding:3px; font-size:80%')),
-          uiOutput("box1"),
-          a(href="http://databrew.cc",
-            target="_blank", 
-            uiOutput("box2")),
-          a(href="http://databrew.cc",
-            target="_blank", 
-            uiOutput("box3"))
-          
+          column(6,
+                 selectInput('athlete',
+                             'Select 1 or more athletes',
+                             choices = sort(unique(athletes$firstname)),
+                             selected = sort(unique(athletes$firstname)),
+                             # selected = c('Ben', 'Chris', 'Joe', 'Xing'), #sort(unique(athletes$firstname)),
+                             multiple = TRUE),
+                 fluidRow(column(4,
+                                 checkboxInput('simple_map',
+                                               'Rough approximations for line map (much faster)',
+                                               TRUE)),
+                          column(8,
+                                 checkboxInput('lines',
+                                               'Show lines instead of heat map (much slower - only recommended if fewer than 30 mappable activities are selected)',
+                                               FALSE),
+                                 checkboxInput('stack', 'Stack bars?', FALSE))))
         ),
-        fluidRow(column(6,
-                        selectInput('athlete',
-                                    'Select 1 or more athletes',
-                                    choices = sort(unique(athletes$firstname)),
-                                    selected = c('Ben', 'Chris', 'Joe', 'Xing'), #sort(unique(athletes$firstname)),
-                                    multiple = TRUE),
-                        checkboxInput('stack', 'Stack bars?', FALSE),
-                        plotOutput('main_plot')),
-                 column(6,
+        fluidRow(column(12,
                         tabsetPanel(
+                          tabPanel('Chart',
+                                   plotOutput('main_plot')),
                           tabPanel('Static map',
                                    radioButtons('static_input',
                                                 'One map per:',
@@ -90,15 +98,7 @@ body <- dashboardBody(
                                    plotOutput('static')),
                           tabPanel('Interactive map',
                                    h3(textOutput('leaf_text'), align='center'),
-                                   leafletOutput('leaf'),
-                                   fluidRow(column(4,
-                                                   checkboxInput('simple_map',
-                                                                 'Rough approximations for line map (much faster)',
-                                                                 TRUE)),
-                                            column(8,
-                                                   checkboxInput('lines',
-                                                                 'Show lines instead of heat map (much slower - only recommended if fewer than 30 mappable activities are selected)',
-                                                                 FALSE)))
+                                   leafletOutput('leaf')
                           )
                         ))
                  )
@@ -167,17 +167,9 @@ server <- function(input, output) {
       "Day number", 
       icon = icon("calendar"),
       color = 'blue',
-      width = 2
+      width = 12
     )})
   
-  output$box2 <- renderUI({
-    valueBox(
-      nrow(athletes), 
-      "Participants", 
-      icon = icon("tachometer"),
-      color = 'orange',
-      width = 2
-    )})
   
   output$box3 <- renderUI({
     valueBox(
@@ -185,7 +177,7 @@ server <- function(input, output) {
       "minutes exercised", 
       icon = icon("clock-o"),
       color = 'green',
-      width = 2
+      width = 12
     )})
   
   activities_filtered <- reactive({
@@ -487,10 +479,20 @@ server <- function(input, output) {
           labs(x = 'Name',
                y = 'Minutes') +
           theme_black()
-        Rmisc::multiplot(g1, g2, cols = 1)
+        Rmisc::multiplot(g1, g2, cols = 2)
       }
     }
   })
+  
+  output$boxes_ui <- renderUI({
+    af <- activities_filtered()
+    
+      eval(parse(text = boxes(overall = af)))
+    
+  })
+  
+  
+  
                             }
 
 shinyApp(ui, server)
