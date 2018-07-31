@@ -58,3 +58,37 @@ boxes <- function(overall){
   out <- paste0('fluidRow(', out, ')')
   return(out)
 }
+
+# Clean up types
+activities <- activities %>%
+  mutate(type = ifelse(type == 'Run' & average_speed_clean < 1.9 | type == 'Hike',
+                       'Walk', 
+                       ifelse(type == 'WeightTraining', 'Workout',
+                              ifelse(type == 'Hike', 'Walk', type)))) 
+
+# Get total distance by person
+starty <- as.Date('2018-01-29')
+distance <- activities %>%
+  filter(distance_clean > 0,
+         start_date >= starty,
+         type != 'Workout') %>%
+  mutate(date = as.Date(start_date)) %>%
+  group_by(date, athlete_id, type) %>%
+  summarise(meters = sum(distance_clean)) %>%
+  ungroup %>%
+  arrange(date) %>%
+  group_by(athlete_id, type) %>%
+  mutate(meters_cum = cumsum(meters)) %>%
+  ungroup %>%
+  left_join(athletes %>%
+              dplyr::select(id, firstname),
+            by = c('athlete_id' = 'id'))  %>%
+  mutate(km_cum = meters_cum / 1000,
+         km = meters / 1000)
+
+# ggplot(data = distance,
+#        aes(x = date, y = km_cum,
+#            color = firstname)) +
+#   geom_line() +
+#   facet_wrap(~type,
+#              scales = 'free_y')

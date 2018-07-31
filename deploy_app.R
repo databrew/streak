@@ -14,7 +14,7 @@ recipients <- c("joebrew@gmail.com")
 send.mail(from = sender,
           to = recipients,
           subject = "Streak app was just redeployed",
-          body = "Just letting you know",
+          body = "www.streak.family",
           smtp = list(host.name = "smtp.gmail.com", port = 465, 
                       user.name = "joebrew@gmail.com",            
                       passwd = pass, ssl = TRUE),

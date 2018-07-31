@@ -3,13 +3,106 @@ library(ggthemes)
 library(RColorBrewer)
 library(leaflet.extras)
 library(lubridate)
-
+library(ggmap)
 
 athletes <- read_csv('data/athletes.csv')
 activities <- read_csv('data/activities.csv')
 polylines <- read_csv('data/polylines.csv')
 streams <- read_csv('data/streams.csv')
+
+activities <- activities %>%
+  filter(!duplicated(id))
+
+if(!'starting_locations.csv' %in% dir('data')){
+  starting_locations <- activities %>%
+    dplyr::select(id,
+                  start_latitude,
+                  start_longitude)
+  starting_locations$locality <- starting_locations$postal_code <- starting_locations$country <- as.character(NA)
+  for(i in 1:nrow(starting_locations)){
+    message('Geocoding ', i, ' of ', nrow(starting_locations))
+    this_activity <- starting_locations[i,]
+    if(!is.na(this_activity$start_latitude)){
+      x <- ggmap::revgeocode(location = c(this_activity$start_longitude, this_activity$start_latitude), output = 'more')
+      if('locality' %in% names(x)){
+        starting_locations$locality[i] <- as.character(x$locality)
+      }
+      if('postal_code' %in% names(x)){
+        starting_locations$postal_code[i] <- as.character(x$postal_code) 
+      }
+      if('country' %in% names(x)){
+        starting_locations$country[i] <- as.character(x$country)
+      }
+      Sys.sleep(1)
+    }
+  }
+  starting_locations <- starting_locations %>%
+    filter(!duplicated(id))
+  write_csv(starting_locations, 'data/starting_locations.csv')
+}
+starting_locations <- read_csv('data/starting_locations.csv')
 # 
+
+# Check to see if there are any un-geocoded starting locations
+need_gc <- unique(c(activities$id[!activities$id %in% starting_locations$id],
+                    starting_locations$id[!is.na(starting_locations$start_latitude) & is.na(starting_locations$country)]))
+
+if(length(need_gc) > 0){
+  sl_list <- list()
+  for(i in 1:length(need_gc)){
+    this_id <- need_gc[i]
+    this_index <- which(activities$id == this_id)
+    this_activity <- activities[activities$id == this_id,]
+    this_location <- c(this_activity$start_longitude, this_activity$start_latitude)
+    if(!any(is.na(this_location))){
+      message('Geocoding for:')
+      print(this_location)
+      # Make new dataframe for plugging into
+      sl <- data_frame(id = this_id,
+                       start_latitude = this_activity$start_latitude,
+                       start_longitude = this_activity$start_longitude,
+                       country = NA,
+                       postal_code = NA,
+                       locality = NA)
+      
+      x <- revgeo::revgeo(sl$start_longitude,
+                          sl$start_latitude, 
+                          provider = NULL,
+                          output = 'frame')
+
+      
+      if('city' %in% names(x)){
+        sl$locality <- as.character(x$city)
+      }
+      if('zip' %in% names(x)){
+        sl$postal_code <- as.character(x$zip) 
+      }
+      if('country' %in% names(x)){
+        sl$country <- as.character(x$country)
+      }
+      sl_list[[i]] <- sl
+      if(this_id %in% starting_locations$id){
+        starting_locations <- starting_locations %>%
+          filter(id != this_id)
+      }
+      
+    }
+  }  
+  sl <- bind_rows(sl_list)
+  starting_locations <- bind_rows(starting_locations, sl)
+  message('Overwriting csv')
+  write_csv(starting_locations, 'data/starting_locations.csv')
+}
+
+# Join starting locations and activities
+activities <-
+  left_join(x = activities,
+            y = starting_locations %>%
+              dplyr::select(id,
+                            country, postal_code,
+                            locality),
+            by = 'id')
+
 
 # Clean up moving time
 clean_time <- function(x){
@@ -29,6 +122,10 @@ activities$streak <- activities$start_date_local >= as.Date('2018-01-29')
 
 # Make start date a date object
 activities$start_date_local <- as.Date(activities$start_date_local)
+
+# Clean up distance
+activities$distance_clean <- 
+  as.numeric(unlist(lapply(strsplit(activities$distance, ' '), function(x){x[1]})))
 
 # # joe streams
 # streams_sub <- streams %>%
@@ -186,3 +283,6 @@ activities$start_date_local <- as.Date(activities$start_date_local)
 # }
 # multiplot_joe(plotlist = map_list)
 # map_list[[2]]
+
+# Define localities
+localities <- sort(unique(activities$locality))

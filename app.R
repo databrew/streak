@@ -1,7 +1,5 @@
 library(shiny)
 library(shinydashboard)
-library(sparkline)
-library(jsonlite)
 library(dplyr)
 options(scipen='999')
 source('read_data.R')
@@ -71,8 +69,10 @@ body <- dashboardBody(
           column(6,
                  selectInput('athlete',
                              'Select 1 or more athletes',
-                             choices = sort(unique(athletes$firstname)),
-                             selected = sort(unique(athletes$firstname)),
+                             choices = c('Ben', 'Chris', 'Joe'),
+                             selected = c('Ben', 'Chris', 'Joe'),
+                             # choices = sort(unique(athletes$firstname)),
+                             # selected = sort(unique(athletes$firstname)),
                              # selected = c('Ben', 'Chris', 'Joe', 'Xing'), #sort(unique(athletes$firstname)),
                              multiple = TRUE),
                  fluidRow(column(4,
@@ -87,15 +87,18 @@ body <- dashboardBody(
         ),
         fluidRow(column(12,
                         tabsetPanel(
-                          tabPanel('Chart',
-                                   plotOutput('main_plot')),
+                          
                           tabPanel('Static map',
                                    radioButtons('static_input',
                                                 'One map per:',
                                                 choices = c('Place', 'Activity'),
+                                                selected = 'Place',
                                                 inline = TRUE,
-                                                selected = 'Activity'),
+                                                width = '100%'),
+                                   uiOutput('place_filter'),
                                    plotOutput('static')),
+                          tabPanel('Chart',
+                                   plotOutput('main_plot', height = '600px')),
                           tabPanel('Interactive map',
                                    h3(textOutput('leaf_text'), align='center'),
                                    leafletOutput('leaf')
@@ -213,7 +216,7 @@ server <- function(input, output) {
       dr <- date_range()
       x <- x %>%
         left_join(activities %>%
-                    dplyr::select(id, athlete_id, streak, start_date_local),
+                    dplyr::select(id, athlete_id, streak, start_date_local, locality),
                   by = c('activity_id'='id')) %>%
         filter(athlete_id %in% this_athlete_id) %>%
         filter(start_date_local >= dr[1],
@@ -306,6 +309,39 @@ server <- function(input, output) {
     }
   })
   
+  output$place_filter <- renderUI({
+    if(input$static_input == 'Place'){
+      athlete <- input$athlete
+      the_choices <- localities
+      selected <- the_choices
+      x <- activities_filtered()
+      if(!is.null(x)){
+        the_choices <- sort(unique(x$locality))
+      }
+      
+      if(length(athlete) > 1){
+      } else {
+        if(athlete == 'Joe'){
+          selected <- 'Santa Coloma de Queralt'
+        } 
+        if(athlete == 'Chris'){
+          selected <- 'Gainesville'
+        }
+        if(athlete == 'Ben'){
+          selected <- 'Toronto'
+        }
+      }
+      selectInput('places',
+                  'Filter places',
+                  choices = the_choices,
+                  selected = selected,
+                  multiple = TRUE,
+                  width = '100%')
+    } else {
+      NULL
+    }
+  })
+  
   output$static <- renderPlot({
     tracks_sub <- tracks()
     if(!is.null(tracks_sub)){
@@ -328,6 +364,17 @@ server <- function(input, output) {
         
         
         if(byby == 'Place'){
+          the_places <- input$places
+          no_place_flag <- FALSE
+          if(!is.null(the_places)){
+            new_tracks_sub <- tracks_sub %>%
+              filter(locality %in% the_places)
+            if(nrow(new_tracks_sub) == 0){
+              no_place_flag <- TRUE
+            } else {
+              tracks_sub <- new_tracks_sub
+            }
+          }
           g <- ggplot(data = tracks_sub,
                       aes(x = lng,
                           y = lat)) +
@@ -335,18 +382,23 @@ server <- function(input, output) {
                           color = factor(firstname)),
                       size = 0.35, lineend = "round",
                       alpha = 0.3) +
-            facet_wrap(~place_id, scales = 'free')
+            facet_wrap(~locality, scales = 'free')
         } else if(byby == 'Activity'){
           g <- ggplot(data = tracks_sub,
                       aes(x = lng,
                           y = lat)) +
             geom_path(aes(group = activity_id,
                           color = factor(firstname)),
-                      size = 0.85, lineend = "round",
+                      size = 0.35, lineend = "round",
                       alpha = 0.3) +
             facet_wrap(~activity_id, scales = 'free')
         }
         
+        if(no_place_flag){
+          g <- g  + 
+            labs(title = 'No places found for selected locations',
+                 subtitle = 'Showing ALL locations')
+        }
         
         g +
           scale_color_manual(name = '', values = cols) +
@@ -387,6 +439,7 @@ server <- function(input, output) {
           theme(legend.position = 'bottomright') +
           guides(fill=guide_legend(ncol=length(unique(tracks_sub$firstname)))) +
           labs(x = '', y = '')
+        
         
       }
     }
@@ -448,10 +501,6 @@ server <- function(input, output) {
         g1
         
         by_type <- af %>%
-          mutate(type = ifelse(type == 'Run' & average_speed_clean < 1.9 | type == 'Hike',
-                               'Walk', 
-                               ifelse(type == 'WeightTraining', 'Workout',
-                                      type))) %>%
           group_by(athlete_id, type) %>%
           summarise(minutes = sum(moving_time_clean, na.rm = TRUE) / 60) %>%
           ungroup %>%
