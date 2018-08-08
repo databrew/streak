@@ -69,8 +69,8 @@ body <- dashboardBody(
           column(6,
                  selectInput('athlete',
                              'Select 1 or more athletes',
-                             choices = c('Ben', 'Chris', 'Joe'),
-                             selected = c('Ben', 'Chris', 'Joe'),
+                             choices = c('Anna', 'Chris', 'Joe'),
+                             selected = c('Anna', 'Chris', 'Joe'),
                              # choices = sort(unique(athletes$firstname)),
                              # selected = sort(unique(athletes$firstname)),
                              # selected = c('Ben', 'Chris', 'Joe', 'Xing'), #sort(unique(athletes$firstname)),
@@ -327,8 +327,8 @@ server <- function(input, output) {
         if(athlete == 'Chris'){
           selected <- 'Gainesville'
         }
-        if(athlete == 'Ben'){
-          selected <- 'Toronto'
+        if(athlete == 'Anna'){
+          selected <- 'New York City'
         }
       }
       selectInput('places',
@@ -384,6 +384,8 @@ server <- function(input, output) {
                       alpha = 0.3) +
             facet_wrap(~locality, scales = 'free')
         } else if(byby == 'Activity'){
+          no_place_flag <- FALSE
+          
           g <- ggplot(data = tracks_sub,
                       aes(x = lng,
                           y = lat)) +
